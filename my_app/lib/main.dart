@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-// HTTP/backend imports removed while using demo data to avoid unused-import warnings
-// import 'package:http/http.dart' as http;
-// import 'dart:convert';
+// HTTP/backend imports (required when calling the backend)
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'custom_mind_map.dart';
 
 void main() {
@@ -56,7 +56,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   bool isLoading = false;
 
-  /*
   Future<void> sendMessage() async {
     final input = _controller.text.trim();
     if (input.isEmpty || isLoading) return;
@@ -79,7 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final res = await http.post(
-        Uri.parse("http://127.0.0.1:8000/analyze"),
+        Uri.parse("http://127.0.0.1:5000/extract_keywords"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"text": input}),
       );
@@ -88,9 +87,9 @@ class _ChatScreenState extends State<ChatScreen> {
         final decoded = utf8.decode(res.bodyBytes);
         final Map<String, dynamic> jsonData = jsonDecode(decoded);
 
-        final String center = jsonData["name"];
-        final List<String> childList = (jsonData["children"] as List)
-            .map((e) => e["name"] as String)
+        final String center = jsonData["title"];
+        final List<String> childList = (jsonData["keywords"] as List)
+            .map((e) => e["keywords"] as String)
             .toList();
 
         setState(() {
@@ -117,7 +116,9 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       isLoading = false;
     });
-  }*/
+  }
+
+  /*
   Future<void> sendMessage() async {
     final input = _controller.text.trim();
     if (input.isEmpty || isLoading) return;
@@ -168,7 +169,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       isLoading = false;
     });
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
