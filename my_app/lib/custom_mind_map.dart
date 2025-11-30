@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+/// Responsive Mind Map (Mobile + Tablet + Desktop)
+/// Auto-fits, aligns left on small screens, avoids overflow.
 class CustomMindMap extends StatelessWidget {
   final String centerLabel;
   final List<String> children;
@@ -13,42 +15,85 @@ class CustomMindMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double radius = 140;
-    final double canvasSize = 2 * radius + 200;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 600;
+
+    /// Dynamic sizing based on screen
+    final double radius = isMobile ? 90 : 140;
+    final double centerSize = isMobile ? 90 : 120;
+    final double childSize = isMobile ? 70 : 100;
+
+    /// Canvas auto-adjusts to content, not full page
+    final double canvasSize = radius * 2 + centerSize + 40;
     final Offset center = Offset(canvasSize / 2, canvasSize / 2);
 
-    return Center(
-      child: SizedBox(
-        width: canvasSize,
-        height: canvasSize,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            CustomPaint(
-              size: Size(canvasSize, canvasSize),
-              painter: LinePainter(center: center, count: children.length, radius: radius),
+    return Align(
+      alignment: isMobile ? Alignment.centerLeft : Alignment.center,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color.fromRGBO(0, 0, 0, 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white30),
+          ),
+          child: SizedBox(
+            width: canvasSize,
+            height: canvasSize,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                /// Draw connecting lines
+                CustomPaint(
+                  size: Size(canvasSize, canvasSize),
+                  painter: LinePainter(
+                    center: center,
+                    count: children.length,
+                    radius: radius,
+                  ),
+                ),
+
+                /// Center node
+                Positioned(
+                  left: center.dx - centerSize / 2,
+                  top: center.dy - centerSize / 2,
+                  child: _buildNode(
+                    centerLabel,
+                    isCenter: true,
+                    size: centerSize,
+                  ),
+                ),
+
+                /// Child nodes (around the circle)
+                for (int i = 0; i < children.length; i++)
+                  Positioned(
+                    left:
+                        center.dx +
+                        cos(2 * pi * i / children.length) * radius -
+                        childSize / 2,
+                    top:
+                        center.dy +
+                        sin(2 * pi * i / children.length) * radius -
+                        childSize / 2,
+                    child: _buildNode(children[i], size: childSize),
+                  ),
+              ],
             ),
-            Positioned(
-              left: center.dx - 60,
-              top: center.dy - 60,
-              child: _buildNode(centerLabel, isCenter: true),
-            ),
-            for (int i = 0; i < children.length; i++)
-              Positioned(
-                left: center.dx + cos(2 * pi * i / children.length) * radius - 50,
-                top: center.dy + sin(2 * pi * i / children.length) * radius - 50,
-                child: _buildNode(children[i]),
-              ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNode(String label, {bool isCenter = false}) {
+  Widget _buildNode(
+    String label, {
+    bool isCenter = false,
+    required double size,
+  }) {
     return Container(
-      width: isCenter ? 120 : 100,
-      height: isCenter ? 120 : 100,
+      width: size,
+      height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: isCenter ? Colors.blue : Colors.white,
@@ -56,27 +101,27 @@ class CustomMindMap extends StatelessWidget {
         border: isCenter ? null : Border.all(color: Colors.blue, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: const Color.fromRGBO(0, 0, 0, 0.2),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(8),
       child: Text(
         label,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontFamily: 'Tamil',
           color: isCenter ? Colors.white : Colors.black,
           fontWeight: FontWeight.bold,
-          fontSize: isCenter ? 16 : 14,
+          fontSize: size * 0.16,
         ),
       ),
     );
   }
 }
 
+/// Draws lines between center and child nodes
 class LinePainter extends CustomPainter {
   final Offset center;
   final int count;
@@ -95,12 +140,12 @@ class LinePainter extends CustomPainter {
       ..strokeWidth = 2;
 
     for (int i = 0; i < count; i++) {
-      final angle = 2 * pi * i / count;
-      final Offset childOffset = Offset(
+      final double angle = 2 * pi * i / count;
+      final Offset child = Offset(
         center.dx + cos(angle) * radius,
         center.dy + sin(angle) * radius,
       );
-      canvas.drawLine(center, childOffset, paint);
+      canvas.drawLine(center, child, paint);
     }
   }
 

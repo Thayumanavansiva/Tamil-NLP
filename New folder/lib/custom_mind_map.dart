@@ -16,6 +16,7 @@ class CustomMindMap extends StatelessWidget {
     const double radius = 140;
     final double canvasSize = 2 * radius + 200;
     final Offset center = Offset(canvasSize / 2, canvasSize / 2);
+    final int count = children.length;
 
     return Center(
       child: SizedBox(
@@ -24,21 +25,28 @@ class CustomMindMap extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            CustomPaint(
-              size: Size(canvasSize, canvasSize),
-              painter: LinePainter(center: center, count: children.length, radius: radius),
-            ),
+            // Only paint lines if there are children to connect to.
+            if (count > 0)
+              CustomPaint(
+                size: Size(canvasSize, canvasSize),
+                painter: LinePainter(
+                  center: center,
+                  count: count,
+                  radius: radius,
+                ),
+              ),
             Positioned(
               left: center.dx - 60,
               top: center.dy - 60,
               child: _buildNode(centerLabel, isCenter: true),
             ),
-            for (int i = 0; i < children.length; i++)
-              Positioned(
-                left: center.dx + cos(2 * pi * i / children.length) * radius - 50,
-                top: center.dy + sin(2 * pi * i / children.length) * radius - 50,
-                child: _buildNode(children[i]),
-              ),
+            if (count > 0)
+              for (int i = 0; i < count; i++)
+                Positioned(
+                  left: center.dx + cos(2 * pi * i / count) * radius - 50,
+                  top: center.dy + sin(2 * pi * i / count) * radius - 50,
+                  child: _buildNode(children[i]),
+                ),
           ],
         ),
       ),
@@ -104,6 +112,11 @@ class LinePainter extends CustomPainter {
     }
   }
 
+  // Repaint when important parameters change (count or radius).
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant LinePainter oldDelegate) {
+    return oldDelegate.count != count ||
+        oldDelegate.radius != radius ||
+        oldDelegate.center != center;
+  }
 }
