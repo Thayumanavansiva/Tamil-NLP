@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
+// HTTP/backend imports (required when calling the backend)
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'custom_mind_map.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+void main() {
+  runApp(const MindMapApp());
 }
 
+// Backwards-compatible wrapper used by the default widget test which expects
+// a `MyApp` class. Keep this thin so tests referencing `MyApp` continue to work.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -51,180 +49,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> messages = [
     ChatMessage(
       role: "assistant",
-      content: "உரை உள்ளிடவும் அல்லது படத்தை தேர்வு செய்து உரையை பெறவும்!",
+      content: "உங்கள் பத்தியை உள்ளிடுங்கள், மன வரைபடம் உருவாகும்!",
     ),
   ];
 
   final TextEditingController _controller = TextEditingController();
   bool isLoading = false;
 
-  // 🔥 PICK IMAGE FROM GALLERY → EXTRACT TEXT WITH OCR
-  Future<void> pickImageAndExtract() async {
-    try {
-      final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-      if (image == null) return;
-      if (!mounted) return;
-
-      setState(() {
-        messages.add(
-          ChatMessage(
-            role: "assistant",
-            content: "🔍 உரை பிரித்தெடுக்கப்படுகிறது...",
-          ),
-        );
-      });
-
-      try {
-        final inputImage = InputImage.fromFilePath(image.path);
-        final textRecognizer = TextRecognizer();
-        final RecognizedText recognizedText = await textRecognizer.processImage(
-          inputImage,
-        );
-
-        await textRecognizer.close();
-
-        final extracted = recognizedText.text.trim();
-
-        if (!mounted) return;
-        setState(() {
-          messages.removeLast();
-        });
-
-        if (extracted.isEmpty) {
-          setState(() {
-            messages.add(
-              ChatMessage(
-                role: "assistant",
-                content: "❌ படத்தில் உரை கண்டறிய முடியவில்லை",
-              ),
-            );
-          });
-          return;
-        }
-
-        setState(() {
-          _controller.text = extracted;
-          messages.add(
-            ChatMessage(
-              role: "assistant",
-              content: "✅ உரை பிரித்தெடுக்கப்பட்டது. இப்போது அனுப்புவும்!",
-            ),
-          );
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          messages.removeLast();
-          messages.add(
-            ChatMessage(role: "assistant", content: "❌ OCR பிழை: $e"),
-          );
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ பிழை: $e")));
-    }
-  }
-
-  // 🔥 PICK FILE (IMAGE OR DOC) → EXTRACT TEXT WITH OCR
-  Future<void> pickFileAndExtract() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-      );
-
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.first;
-      final filePath = file.path;
-
-      if (filePath == null) return;
-      if (!mounted) return;
-
-      setState(() {
-        messages.add(
-          ChatMessage(
-            role: "assistant",
-            content: "🔍 உரை பிரித்தெடுக்கப்படுகிறது...",
-          ),
-        );
-      });
-
-      try {
-        if (file.extension?.toLowerCase() == 'pdf') {
-          setState(() {
-            messages.removeLast();
-            messages.add(
-              ChatMessage(
-                role: "assistant",
-                content:
-                    "⚠️ PDF ஆதரவு சீக்கிரம் கிடைக்கும். பதிலாக படத்தை பயன்படுத்தவும்.",
-              ),
-            );
-          });
-          return;
-        }
-
-        final inputImage = InputImage.fromFilePath(filePath);
-        final textRecognizer = TextRecognizer();
-        final RecognizedText recognizedText = await textRecognizer.processImage(
-          inputImage,
-        );
-
-        await textRecognizer.close();
-
-        final extracted = recognizedText.text.trim();
-
-        if (!mounted) return;
-
-        setState(() {
-          messages.removeLast();
-        });
-
-        if (extracted.isEmpty) {
-          setState(() {
-            messages.add(
-              ChatMessage(
-                role: "assistant",
-                content: "❌ கோப்பில் உரை கண்டறிய முடியவில்லை",
-              ),
-            );
-          });
-          return;
-        }
-
-        setState(() {
-          _controller.text = extracted;
-          messages.add(
-            ChatMessage(
-              role: "assistant",
-              content: "✅ உரை பிரித்தெடுக்கப்பட்டது. இப்போது அனுப்புவும்!",
-            ),
-          );
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          messages.removeLast();
-          messages.add(
-            ChatMessage(role: "assistant", content: "❌ OCR பிழை: $e"),
-          );
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("❌ பிழை: $e")));
-    }
-  }
-
-  // 🔥 SEND TEXT → BACKEND → GET MIND MAP
   Future<void> sendMessage() async {
     final input = _controller.text.trim();
     if (input.isEmpty || isLoading) return;
@@ -232,42 +63,41 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       messages.add(ChatMessage(role: "user", content: input));
       isLoading = true;
-      messages.add(
-        ChatMessage(
-          role: "assistant",
-          content: "🔄 மன வரைபடம் உருவாக்கப்படுகிறது...",
-        ),
-      );
     });
 
     _controller.clear();
 
+    setState(() {
+      messages.add(
+        ChatMessage(
+          role: "assistant",
+          content: "மன வரைபடம் உருவாக்கப்படுகிறது...",
+        ),
+      );
+    });
+
     try {
       final res = await http.post(
-        Uri.parse("http://127.0.0.1:5000/extract_keywords"),
+        Uri.parse("http://10.231.207.166:5000/extract_keywords"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"text": input}),
       );
 
       if (res.statusCode == 200) {
-        final Map<String, dynamic> jsonData = jsonDecode(
-          utf8.decode(res.bodyBytes),
-        );
+        final decoded = utf8.decode(res.bodyBytes);
+        final Map<String, dynamic> jsonData = jsonDecode(decoded);
 
-        final String center = jsonData["title"] ?? "மையம் இல்லை";
-        final List<String> children =
-            (jsonData["keywords"] as List?)
-                ?.map((e) => e["keywords"] as String)
-                .toList() ??
-            [];
+        final String center = jsonData["title"];
+        final List<String> childList = (jsonData["keywords"] as List)
+            .map((e) => e["keywords"] as String)
+            .toList();
 
-        if (!mounted) return;
         setState(() {
-          messages.removeLast();
+          messages.removeLast(); // remove "loading"
           messages.add(
             ChatMessage(
               role: "assistant",
-              content: CustomMindMap(centerLabel: center, children: children),
+              content: CustomMindMap(centerLabel: center, children: childList),
             ),
           );
         });
@@ -275,19 +105,72 @@ class _ChatScreenState extends State<ChatScreen> {
         throw Exception("Server error ${res.statusCode}");
       }
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         messages.removeLast();
-        messages.add(ChatMessage(role: "assistant", content: "❌ பிழை: $e"));
+        messages.add(
+          ChatMessage(role: "assistant", content: "❌ பிழை ஏற்பட்டது: $e"),
+        );
       });
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
-  // UI SECTION
+  /*
+  Future<void> sendMessage() async {
+    final input = _controller.text.trim();
+    if (input.isEmpty || isLoading) return;
+
+    setState(() {
+      messages.add(ChatMessage(role: "user", content: input));
+      isLoading = true;
+    });
+
+    _controller.clear();
+
+    setState(() {
+      messages.add(
+        ChatMessage(
+          role: "assistant",
+          content: "மன வரைபடம் உருவாக்கப்படுகிறது...",
+        ),
+      );
+    });
+
+    await Future.delayed(const Duration(seconds: 1)); // fake loading
+
+    /// DEMO JSON OUTPUT FOR TESTING UI (NO BACKEND)
+    final demoJson = {
+      "name": "தொழில்நுட்பம்",
+      "children": [
+        {"name": "மேஷின் லர்னிங்"},
+        {"name": "ஏஐ மாடல்கள்"},
+        {"name": "டேட்டா சயின்ஸ்"},
+        {"name": "மொபைல் அப்ளிக்கேஷன்"},
+        {"name": "தகவல் பாதுகாப்பு"},
+        {"name": "வேலை வாய்ப்பு"},
+      ],
+    };
+
+    final String center = demoJson["name"] as String;
+    final List<String> childList = (demoJson["children"] as List)
+        .map((e) => e["name"] as String)
+        .toList();
+
+    setState(() {
+      messages.removeLast();
+      messages.add(
+        ChatMessage(
+          role: "assistant",
+          content: CustomMindMap(centerLabel: center, children: childList),
+        ),
+      );
+      isLoading = false;
+    });
+  }*/
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -300,7 +183,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const Divider(color: Colors.white24),
 
-          // Messages
+          /// Messages List
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
@@ -314,10 +197,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.all(12),
                     margin: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.white : Colors.grey[900],
+                      color: isUser ? Colors.white : Colors.grey[850],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: msg.content is String
@@ -325,6 +208,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             msg.content,
                             style: TextStyle(
                               color: isUser ? Colors.black : Colors.white,
+                              fontSize: 15,
                             ),
                           )
                         : msg.content,
@@ -336,52 +220,26 @@ class _ChatScreenState extends State<ChatScreen> {
 
           const Divider(color: Colors.white24),
 
-          // Input area
+          /// Input Field
           Padding(
             padding: const EdgeInsets.all(10),
-            child: Column(
+            child: Row(
               children: [
-                // 🔥 FILE & IMAGE BUTTONS
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: isLoading ? null : pickFileAndExtract,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text("📄 பதிவேற்று"),
-                      ),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    enabled: !isLoading,
+                    decoration: const InputDecoration(
+                      hintText: "உங்கள் உரையை இங்கே பதிவு செய்யவும்...",
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: isLoading ? null : pickImageAndExtract,
-                        icon: const Icon(Icons.image),
-                        label: const Text("📷 படம்"),
-                      ),
-                    ),
-                  ],
+                    onSubmitted: (_) => sendMessage(),
+                  ),
                 ),
-                const SizedBox(height: 10),
-                // TEXT INPUT
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        enabled: !isLoading,
-                        decoration: const InputDecoration(
-                          hintText: "உரை எழுதவும் அல்லது அப்லோட் செய்யவும்...",
-                          border: OutlineInputBorder(),
-                        ),
-                        onSubmitted: (_) => sendMessage(),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton(
-                      onPressed: isLoading ? null : sendMessage,
-                      child: Text(isLoading ? "⏳" : "அனுப்பு"),
-                    ),
-                  ],
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: isLoading ? null : sendMessage,
+                  child: Text(isLoading ? "⏳" : "அனுப்பு"),
                 ),
               ],
             ),
@@ -389,11 +247,5 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 }
