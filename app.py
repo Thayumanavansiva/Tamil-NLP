@@ -5,7 +5,7 @@ import requests, json
 app = Flask(__name__)
 CORS(app)
 
-# LM Studio API config
+# LM Studio API config ih
 LM_STUDIO_URL = "http://10.231.207.166:1234/v1/chat/completions"  # Replace with your LM Studio server
 MODEL_NAME = "meta-llama-3.1-8b-instruct"
 
