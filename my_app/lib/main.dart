@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'custom_mind_map.dart'; // Your mind map widget
+import 'custom_mind_map.dart';
 
 void main() {
   runApp(const MindMapApp());
 }
 
+/// ----------------------------
+/// APP ROOT
+/// ----------------------------
 class MindMapApp extends StatelessWidget {
   const MindMapApp({super.key});
 
@@ -21,12 +24,19 @@ class MindMapApp extends StatelessWidget {
   }
 }
 
+/// ----------------------------
+/// CHAT MESSAGE MODEL
+/// ----------------------------
 class ChatMessage {
   final String role;
   final dynamic content;
+
   ChatMessage({required this.role, required this.content});
 }
 
+/// ----------------------------
+/// CHAT SCREEN
+/// ----------------------------
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -37,12 +47,34 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> messages = [
     ChatMessage(
-        role: "assistant",
-        content: "உங்கள் பத்தியை உள்ளிடுங்கள், மன வரைபடம் உருவாகும்!")
+      role: "assistant",
+      content: "உங்கள் பத்தியை உள்ளிடுங்கள், மன வரைபடம் உருவாகும்!",
+    ),
   ];
+
   final TextEditingController _controller = TextEditingController();
   bool isLoading = false;
 
+  /// ----------------------------
+  /// JSON → TREE PARSER
+  /// ----------------------------
+  MindMapNode parseMindMap(Map<String, dynamic> json) {
+    return MindMapNode(
+      label: json["title"] ?? "மைய தலைப்பு இல்லை",
+      children: (json["keywords"] as List).map<MindMapNode>((item) {
+        return MindMapNode(
+          label: item["level1"],
+          children: (item["level2"] as List)
+              .map<MindMapNode>((sub) => MindMapNode(label: sub))
+              .toList(),
+        );
+      }).toList(),
+    );
+  }
+
+  /// ----------------------------
+  /// SEND MESSAGE + API CALL
+  /// ----------------------------
   Future<void> sendMessage() async {
     final input = _controller.text.trim();
     if (input.isEmpty || isLoading) return;
@@ -50,8 +82,12 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       messages.add(ChatMessage(role: "user", content: input));
       isLoading = true;
-      messages.add(ChatMessage(
-          role: "assistant", content: "மன வரைபடம் உருவாக்கப்படுகிறது..."));
+      messages.add(
+        ChatMessage(
+          role: "assistant",
+          content: "மன வரைபடம் உருவாக்கப்படுகிறது...",
+        ),
+      );
     });
 
     _controller.clear();
@@ -67,16 +103,16 @@ class _ChatScreenState extends State<ChatScreen> {
         final decoded = utf8.decode(res.bodyBytes);
         final Map<String, dynamic> jsonData = jsonDecode(decoded);
 
-        final String center = jsonData["title"] ?? "மைய தலைப்பு இல்லை";
-        final List<String> childList =
-            List<String>.from(jsonData["keywords"] ?? []);
+        final MindMapNode rootNode = parseMindMap(jsonData);
 
         setState(() {
-          // Remove loading message
-          messages.removeLast();
-          messages.add(ChatMessage(
+          messages.removeLast(); // remove loading
+          messages.add(
+            ChatMessage(
               role: "assistant",
-              content: CustomMindMap(centerLabel: center, children: childList)));
+              content: CustomMindMap(root: rootNode),
+            ),
+          );
         });
       } else {
         throw Exception("Server error ${res.statusCode}");
@@ -84,8 +120,9 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       setState(() {
         messages.removeLast();
-        messages.add(ChatMessage(
-            role: "assistant", content: "❌ பிழை ஏற்பட்டது: $e"));
+        messages.add(
+          ChatMessage(role: "assistant", content: "❌ பிழை ஏற்பட்டது: $e"),
+        );
       });
     } finally {
       setState(() {
@@ -94,6 +131,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// ----------------------------
+  /// UI
+  /// ----------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -105,6 +145,8 @@ class _ChatScreenState extends State<ChatScreen> {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const Divider(color: Colors.white24),
+
+          /// CHAT AREA
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
@@ -112,6 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (ctx, i) {
                 final msg = messages[i];
                 final isUser = msg.role == "user";
+
                 return Align(
                   alignment: isUser
                       ? Alignment.centerRight
@@ -127,8 +170,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         ? Text(
                             msg.content,
                             style: TextStyle(
-                                color: isUser ? Colors.black : Colors.white,
-                                fontSize: 15),
+                              color: isUser ? Colors.black : Colors.white,
+                              fontSize: 15,
+                            ),
                           )
                         : msg.content,
                   ),
@@ -136,7 +180,10 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
+
           const Divider(color: Colors.white24),
+
+          /// INPUT AREA
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
