@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:path_provider/path_provider.dart';
 import 'custom_mind_map.dart';
 
 void main() {
@@ -53,6 +57,8 @@ class _ChatScreenState extends State<ChatScreen> {
   ];
 
   final TextEditingController _controller = TextEditingController();
+  final GlobalKey _mindMapKey = GlobalKey();
+
   bool isLoading = false;
 
   /// ----------------------------
@@ -70,6 +76,47 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }).toList(),
     );
+  }
+
+  /// ----------------------------
+  /// DOWNLOAD MIND MAP
+  /// ----------------------------
+  Future<void> downloadMindMap() async {
+    try {
+      final ctx = _mindMapKey.currentContext;
+      if (ctx == null) {
+        throw Exception("Mind map not ready");
+      }
+
+      final boundary = ctx.findRenderObject() as RenderRepaintBoundary;
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      final pngBytes = byteData!.buffer.asUint8List();
+
+      // 📱 ANDROID / DESKTOP
+      Directory directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final file = File(
+        "${directory.path}/mind_map_${DateTime.now().millisecondsSinceEpoch}.png",
+      );
+
+      await file.writeAsBytes(pngBytes);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("✅ Saved to ${directory.path}")));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Download failed: $e")));
+    }
   }
 
   /// ----------------------------
@@ -94,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final res = await http.post(
-        Uri.parse("http://10.231.207.166:5000/extract_keywords"),
+        Uri.parse("http://127.0.0.1:5000/extract_keywords"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"paragraph": input}),
       );
@@ -106,11 +153,15 @@ class _ChatScreenState extends State<ChatScreen> {
         final MindMapNode rootNode = parseMindMap(jsonData);
 
         setState(() {
-          messages.removeLast(); // remove loading
+          messages.removeLast();
           messages.add(
             ChatMessage(
               role: "assistant",
-              content: CustomMindMap(root: rootNode),
+              content: CustomMindMap(
+                root: rootNode,
+                repaintKey: _mindMapKey,
+                onDownload: downloadMindMap, // ✅ PASS CALLBACK
+              ),
             ),
           );
         });
@@ -139,11 +190,14 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       body: Column(
         children: [
-          const SizedBox(height: 50),
+          const SizedBox(height: 40),
+
+          /// TITLE ONLY
           const Text(
             "மன வரைபடம் உருவாக்கி",
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
+
           const Divider(color: Colors.white24),
 
           /// CHAT AREA
@@ -160,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    margin: const EdgeInsets.symmetric(vertical: 6),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isUser ? Colors.white : Colors.grey[850],
@@ -174,7 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               fontSize: 15,
                             ),
                           )
-                        : msg.content,
+                        : msg.content, // 🔥 ONLY THE MAP (BUTTON IS INSIDE)
                   ),
                 );
               },

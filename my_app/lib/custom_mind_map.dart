@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 /// ----------------------------
-/// DATA MODEL (SAME AS main.dart)
+/// DATA MODEL
 /// ----------------------------
 class MindMapNode {
   final String label;
@@ -19,10 +19,14 @@ class MindMapNode {
 /// ----------------------------
 class CustomMindMap extends StatelessWidget {
   final MindMapNode root;
+  final GlobalKey repaintKey;
+  final VoidCallback onDownload; // 🔥 NEW
 
   const CustomMindMap({
     super.key,
     required this.root,
+    required this.repaintKey,
+    required this.onDownload,
   });
 
   @override
@@ -51,42 +55,59 @@ class CustomMindMap extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white30),
           ),
-          child: SizedBox(
-            width: canvasSize,
-            height: canvasSize,
-            child: Stack(
-              children: [
-                /// CONNECTION LINES
-                CustomPaint(
-                  size: Size(canvasSize, canvasSize),
-                  painter: MultiLevelLinePainter(
-                    root: root,
+          child: RepaintBoundary(
+            key: repaintKey,
+            child: SizedBox(
+              width: canvasSize,
+              height: canvasSize,
+              child: Stack(
+                children: [
+                  /// CONNECTION LINES
+                  CustomPaint(
+                    size: Size(canvasSize, canvasSize),
+                    painter: MultiLevelLinePainter(
+                      root: root,
+                      center: center,
+                      level1Radius: level1Radius,
+                      level2Radius: level2Radius,
+                    ),
+                  ),
+
+                  /// CENTER NODE
+                  Positioned(
+                    left: center.dx - centerSize / 2,
+                    top: center.dy - centerSize / 2,
+                    child: _buildNode(
+                      root.label,
+                      size: centerSize,
+                      isCenter: true,
+                    ),
+                  ),
+
+                  /// LEVEL 1 + LEVEL 2 NODES
+                  ..._buildLevelNodes(
                     center: center,
                     level1Radius: level1Radius,
                     level2Radius: level2Radius,
+                    level1Size: level1Size,
+                    level2Size: level2Size,
                   ),
-                ),
 
-                /// CENTER NODE
-                Positioned(
-                  left: center.dx - centerSize / 2,
-                  top: center.dy - centerSize / 2,
-                  child: _buildNode(
-                    root.label,
-                    size: centerSize,
-                    isCenter: true,
+                  /// 🔽 DOWNLOAD BUTTON OVERLAY
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: IconButton(
+                        icon: const Icon(Icons.download),
+                        tooltip: "Download mind map",
+                        onPressed: onDownload,
+                      ),
+                    ),
                   ),
-                ),
-
-                /// LEVEL 1 + LEVEL 2 NODES
-                ..._buildLevelNodes(
-                  center: center,
-                  level1Radius: level1Radius,
-                  level2Radius: level2Radius,
-                  level1Size: level1Size,
-                  level2Size: level2Size,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -115,7 +136,6 @@ class CustomMindMap extends StatelessWidget {
         center.dy + sin(angle1) * level1Radius,
       );
 
-      /// Level 1 Node
       widgets.add(
         Positioned(
           left: level1Pos.dx - level1Size / 2,
@@ -137,7 +157,6 @@ class CustomMindMap extends StatelessWidget {
           center.dy + sin(angle2) * level2Radius,
         );
 
-        /// Level 2 Node
         widgets.add(
           Positioned(
             left: level2Pos.dx - level2Size / 2,
@@ -191,7 +210,7 @@ class CustomMindMap extends StatelessWidget {
 }
 
 /// ----------------------------
-/// MULTI-LEVEL LINE PAINTER
+/// LINE PAINTER
 /// ----------------------------
 class MultiLevelLinePainter extends CustomPainter {
   final MindMapNode root;
@@ -222,7 +241,6 @@ class MultiLevelLinePainter extends CustomPainter {
         center.dy + sin(angle1) * level1Radius,
       );
 
-      /// Center → Level 1
       canvas.drawLine(center, level1Pos, paint);
 
       final level2Nodes = root.children[i].children;
@@ -238,7 +256,6 @@ class MultiLevelLinePainter extends CustomPainter {
           center.dy + sin(angle2) * level2Radius,
         );
 
-        /// Level 1 → Level 2
         canvas.drawLine(level1Pos, level2Pos, paint);
       }
     }
